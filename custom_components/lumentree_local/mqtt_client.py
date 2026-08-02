@@ -440,7 +440,15 @@ class LumentreeMqttClient:
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 _LOGGER.debug("MQTT message received %s: topic='%s', payload='%s...' (len: %s)", self._client_id, topic, payload_hex[:60], len(payload_bytes))
 
-            if topic in self._topic_subs or topic.endswith(f"/{self._device_sn}"):
+            topic_is_device_related = (
+                topic in self._topic_subs
+                or topic.endswith(f"/{self._device_sn}")
+                or self._device_sn in topic
+                or "listenApp" in topic
+                or "reportApp" in topic
+            )
+
+            if topic_is_device_related:
                 parsed_data = parse_mqtt_payload(payload_hex)
                 if parsed_data:
                     _LOGGER.info(

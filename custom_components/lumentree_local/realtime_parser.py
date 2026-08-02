@@ -217,6 +217,13 @@ def parse_realtime_payload(payload: dict[str, Any] | str | bytes | None) -> dict
         stripped = decoded.strip()
         if not stripped:
             return {}
+        if "listenApp/" in stripped or "reportApp/" in stripped:
+            match = re.search(r"(listenApp|reportApp)/([A-Za-z0-9]+)", stripped)
+            if match:
+                source = match.group(1)
+                device_name = match.group(2)
+                _LOGGER.debug("Detected ascii MQTT route payload: %s/%s", source, device_name)
+                return {"source": source, "device_name": device_name, "online": True, "raw_hex": stripped}
         if len(stripped) >= 8 and all(ch in "0123456789abcdefABCDEF" for ch in stripped):
             parsed = _parse_device_frame(stripped)
             if parsed is not None:
@@ -287,6 +294,15 @@ def parse_mqtt_payload(payload: str | bytes | bytearray | dict[str, Any] | None)
         stripped = decoded.strip()
         if not stripped:
             return None
+        if "listenApp/" in stripped or "reportApp/" in stripped:
+            match = re.search(r"(listenApp|reportApp)/([A-Za-z0-9]+)", stripped)
+            if match:
+                return {
+                    "source": match.group(1),
+                    "device_name": match.group(2),
+                    "online": True,
+                    "raw_hex": stripped,
+                }
         if len(stripped) >= 8 and all(ch in "0123456789abcdefABCDEF" for ch in stripped):
             parsed_frame = _parse_device_frame(stripped)
             if parsed_frame is not None:
