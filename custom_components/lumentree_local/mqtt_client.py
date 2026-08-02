@@ -266,6 +266,9 @@ class LumentreeMqttClient:
                     _LOGGER.error("MQTT connection timeout %s", self._client_id)
                     await self.disconnect()
                     raise ConnectionRefusedError("MQTT connection timeout")
+
+                if self._is_connected:
+                    self.start_polling(self._poll_interval)
             except Exception as exc:
                 _LOGGER.error("Failed MQTT connect %s: %s", self._client_id, exc)
                 if self._mqttc:
