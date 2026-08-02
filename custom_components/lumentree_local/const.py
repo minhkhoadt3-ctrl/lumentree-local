@@ -25,7 +25,7 @@ MQTT_PASSWORD: Final = ""
 MQTT_KEEPALIVE: Final = 60
 MQTT_CLIENT_ID_FORMAT: Final = "ha-lumentree-{device_id}-{timestamp}"
 MQTT_SUB_TOPIC_FORMAT: Final = "reportApp/{device_sn}"
-MQTT_PUB_TOPIC_FORMAT: Final = "controlApp/{device_sn}"
+MQTT_PUB_TOPIC_FORMAT: Final = "listenApp/{device_sn}"
 SIGNAL_UPDATE_FORMAT: Final = "lumentree_local_update_{device_sn}"
 
 ATTR_DEVICE_NAME: Final = "device_name"

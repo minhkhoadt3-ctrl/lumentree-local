@@ -126,7 +126,7 @@ class LumentreeMqttClient:
         self._signal_update = SIGNAL_UPDATE_FORMAT.format(device_sn=self._device_sn)
         self._topic_sub = MQTT_SUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
         self._topic_pub = MQTT_PUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
-        self._topic_subs = tuple(dict.fromkeys([self._topic_sub, f"listenApp/{self._device_sn}"]))
+        self._topic_subs = tuple(dict.fromkeys([self._topic_sub, f"reportApp/{self._device_sn}"]))
 
         self._connect_lock = asyncio.Lock()
         self._reconnect_attempts = 0
