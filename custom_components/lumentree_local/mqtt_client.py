@@ -326,6 +326,17 @@ class LumentreeMqttClient:
             self._schedule_reconnect()
 
     def _schedule_reconnect(self) -> None:
+        if self._stopping:
+            return
+        if self._reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+            _LOGGER.warning(
+                "MQTT reconnect limit reached for %s (%s/%s); stopping retry loop.",
+                self._client_id,
+                self._reconnect_attempts,
+                MAX_RECONNECT_ATTEMPTS,
+            )
+            return
+
         self._reconnect_attempts += 1
         delay = min(RECONNECT_DELAY_SECONDS * (2 ** (self._reconnect_attempts - 1)), 60)
         _LOGGER.info("Scheduling MQTT reconnect %s/%s for %s in %ss", self._reconnect_attempts, MAX_RECONNECT_ATTEMPTS, self._client_id, delay)
@@ -336,6 +347,14 @@ class LumentreeMqttClient:
     async def _async_reconnect(self, delay: float) -> None:
         await asyncio.sleep(delay)
         if self._stopping:
+            return
+        if self._reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+            _LOGGER.warning(
+                "MQTT auto reconnect skipped for %s because retry cap was reached (%s/%s).",
+                self._client_id,
+                self._reconnect_attempts,
+                MAX_RECONNECT_ATTEMPTS,
+            )
             return
         if not self.is_connected and self._mqttc:
             try:
