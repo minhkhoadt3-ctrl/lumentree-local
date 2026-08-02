@@ -128,7 +128,16 @@ class LumentreeMqttClient:
         self._signal_update = SIGNAL_UPDATE_FORMAT.format(device_sn=self._device_sn)
         self._topic_sub = MQTT_SUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
         self._topic_pub = MQTT_PUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
-        self._topic_subs = tuple(dict.fromkeys([self._topic_sub, f"reportApp/{self._device_sn}"]))
+        self._topic_subs = tuple(
+            dict.fromkeys(
+                [
+                    self._topic_sub,
+                    f"reportApp/{self._device_sn}",
+                    "reportApp/#",
+                    "listenApp/#",
+                ]
+            )
+        )
         self._poll_task: Optional[asyncio.Task[None]] = None
         self._poll_interval = DEFAULT_POLLING_INTERVAL
 
@@ -444,8 +453,10 @@ class LumentreeMqttClient:
                 topic in self._topic_subs
                 or topic.endswith(f"/{self._device_sn}")
                 or self._device_sn in topic
-                or "listenApp" in topic
-                or "reportApp" in topic
+                or topic.startswith("listenApp")
+                or topic.startswith("reportApp")
+                or topic.endswith("/+")
+                or topic.endswith("/#")
             )
 
             if topic_is_device_related:
