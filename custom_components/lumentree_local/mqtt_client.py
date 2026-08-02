@@ -87,6 +87,8 @@ class LumentreeMqttClient:
         "_topic_sub",
         "_topic_pub",
         "_topic_subs",
+        "_poll_task",
+        "_poll_interval",
         "_connect_lock",
         "_reconnect_attempts",
         "_is_connected",
@@ -127,6 +129,8 @@ class LumentreeMqttClient:
         self._topic_sub = MQTT_SUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
         self._topic_pub = MQTT_PUB_TOPIC_FORMAT.format(device_sn=self._device_sn)
         self._topic_subs = tuple(dict.fromkeys([self._topic_sub, f"reportApp/{self._device_sn}"]))
+        self._poll_task: Optional[asyncio.Task[None]] = None
+        self._poll_interval = DEFAULT_POLLING_INTERVAL
 
         self._connect_lock = asyncio.Lock()
         self._reconnect_attempts = 0
@@ -284,6 +288,7 @@ class LumentreeMqttClient:
                     if _LOGGER.isEnabledFor(logging.DEBUG):
                         _LOGGER.debug("Subscribe %s %s (mid=%s)", "OK" if result == 0 else "Failed", sub_topic, mid)
                 self._is_connected = True
+                self.hass.loop.call_soon_threadsafe(self.start_polling, self._poll_interval)
             except Exception as exc:
                 _LOGGER.error("MQTT subscribe failed %s: %s", self._client_id, exc)
                 self._is_connected = False
@@ -364,6 +369,38 @@ class LumentreeMqttClient:
             self._reconnect_attempts = MAX_RECONNECT_ATTEMPTS
             self._schedule_reconnect()
 
+    def start_polling(self, interval: float | None = None) -> None:
+        """Start a periodic read request loop to trigger reportApp responses."""
+        if interval is not None:
+            self._poll_interval = interval
+        if self._poll_task is not None and not self._poll_task.done():
+            return
+        self._poll_task = self.hass.async_create_task(self._poll_loop())
+
+    async def stop_polling(self) -> None:
+        if self._poll_task is not None:
+            self._poll_task.cancel()
+            try:
+                await self._poll_task
+            except asyncio.CancelledError:
+                pass
+            self._poll_task = None
+
+    async def _poll_loop(self) -> None:
+        while not self._stopping:
+            if self._is_connected and self._mqttc:
+                _LOGGER.debug(
+                    "MQTT poll tick for %s: sending read request to %s every %ss",
+                    self._client_id,
+                    self._topic_pub,
+                    self._poll_interval,
+                )
+                await self.async_request_data()
+            try:
+                await asyncio.sleep(self._poll_interval)
+            except asyncio.CancelledError:
+                break
+
     def _on_message(self, client, userdata, msg: MQTTMessage) -> None:
         topic = msg.topic
         try:
@@ -395,12 +432,26 @@ class LumentreeMqttClient:
             return False
         try:
             payload_bytes = bytes.fromhex(command_hex)
+            _LOGGER.debug(
+                "MQTT publish request %s -> topic=%s payload=%s len=%s",
+                self._client_id,
+                self._topic_pub,
+                command_hex,
+                len(payload_bytes),
+            )
             msg_info = await self.hass.async_add_executor_job(
                 partial(self._mqttc.publish, self._topic_pub, payload=payload_bytes, qos=0)
             )
             if msg_info is None or msg_info.rc != paho.MQTT_ERR_SUCCESS:
                 _LOGGER.error("MQTT publish failed %s RC: %s", self._client_id, getattr(msg_info, "rc", "Executor Error"))
                 return False
+            _LOGGER.debug(
+                "MQTT publish accepted %s -> topic=%s rc=%s payload=%s",
+                self._client_id,
+                self._topic_pub,
+                getattr(msg_info, "rc", "unknown"),
+                command_hex,
+            )
             return True
         except ValueError as exc:
             _LOGGER.error("Invalid hex payload %s: %s", self._client_id, exc)
@@ -416,6 +467,14 @@ class LumentreeMqttClient:
         num_registers = NUM_MAIN_REGISTERS_TO_READ
         command_hex = generate_modbus_read_command(slave_id, func_code, start_address, num_registers)
         if command_hex:
+            _LOGGER.info(
+                "Requesting inverter data %s: topic=%s start=%s count=%s frame=%s",
+                self._client_id,
+                self._topic_pub,
+                start_address,
+                num_registers,
+                command_hex,
+            )
             await self._publish_command(command_hex)
         else:
             _LOGGER.error("Failed to generate Modbus read (0-%s) %s", num_registers - 1, self._client_id)
@@ -438,6 +497,7 @@ class LumentreeMqttClient:
         self._connected_event.set()
         self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
         self._cancel_batch_timer()
+        await self.stop_polling()
         self.hass.loop.call_soon_threadsafe(self._set_offline)
 
         mqttc_to_disconnect = None
