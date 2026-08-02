@@ -1,0 +1,14 @@
+poll_now:
+  name: Poll now
+  description: Trigger an immediate local refresh from the MQTT device.
+  fields: {}
+
+restart:
+  name: Restart device
+  description: Restart the local Lumentree device through the MQTT bridge.
+  fields: {}
+
+debug:
+  name: Debug
+  description: Toggle or trigger a debug snapshot useful for troubleshooting.
+  fields: {}
