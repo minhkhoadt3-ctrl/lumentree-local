@@ -7,8 +7,18 @@ import time
 from functools import partial
 from typing import Any, Callable, Dict, Optional
 
-import paho.mqtt.client as paho
-from paho.mqtt.client import MQTTMessage
+try:  # pragma: no cover - Home Assistant runtime only
+    import paho.mqtt.client as paho
+    from paho.mqtt.client import MQTTMessage
+except ModuleNotFoundError:  # pragma: no cover - local/unit-test environment
+    class _PahoFallback:
+        CONNACK_ACCEPTED = 0
+        MQTT_ERR_SUCCESS = 0
+        MQTTv311 = 4
+        Client = object
+
+    paho = _PahoFallback()
+    MQTTMessage = Any
 
 try:  # pragma: no cover - Home Assistant runtime only
     from homeassistant.config_entries import ConfigEntry
@@ -293,6 +303,15 @@ class LumentreeMqttClient:
         self._is_connected = False
         self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
         self.hass.loop.call_soon_threadsafe(self._set_offline)
+
+        if rc == 0 and self._stopping:
+            _LOGGER.info("MQTT clean disconnect %s (rc=%s)", self._client_id, rc)
+            return
+
+        if rc == 0:
+            _LOGGER.info("MQTT connection closed cleanly %s (rc=%s)", self._client_id, rc)
+            return
+
         _LOGGER.warning("MQTT unexpected disconnect %s (rc=%s)", self._client_id, rc)
         self.hass.loop.call_soon_threadsafe(self._safe_schedule_reconnect)
 

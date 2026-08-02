@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+
+from custom_components.lumentree_local.mqtt_client import LumentreeMqttClient
 from custom_components.lumentree_local.realtime_parser import parse_mqtt_payload, parse_realtime_payload
 
 
@@ -46,6 +49,36 @@ def test_parse_mqtt_payload_accepts_real_device_frames():
     assert report_result is not None
     assert report_result["device_name"] == "H241205077"
     assert report_result["source"] == "reportApp"
+
+
+def test_mqtt_clean_disconnect_does_not_log_unexpected_warning(caplog):
+    client = object.__new__(LumentreeMqttClient)
+    for slot_name in LumentreeMqttClient.__slots__:
+        if slot_name == "hass":
+            client.hass = type(
+                "HassStub",
+                (),
+                {"loop": type("LoopStub", (), {"call_soon_threadsafe": staticmethod(lambda cb: cb())})()},
+            )()
+        elif slot_name == "_client_id":
+            object.__setattr__(client, "_client_id", "ha-test-client")
+        elif slot_name == "_is_connected":
+            object.__setattr__(client, "_is_connected", True)
+        elif slot_name == "_stopping":
+            object.__setattr__(client, "_stopping", True)
+        elif slot_name == "_offline_timer_unsub":
+            object.__setattr__(client, "_offline_timer_unsub", None)
+        elif slot_name == "_offline_timer_gen":
+            object.__setattr__(client, "_offline_timer_gen", 0)
+        elif slot_name == "_online":
+            object.__setattr__(client, "_online", False)
+        elif slot_name == "_topic_subs":
+            object.__setattr__(client, "_topic_subs", ("reportApp/H241205077",))
+
+    with caplog.at_level(logging.WARNING):
+        client._on_disconnect(None, None, 0)
+
+    assert "unexpected disconnect" not in caplog.text.lower()
 
 
 def test_realtime_sensor_keys_are_defined():
