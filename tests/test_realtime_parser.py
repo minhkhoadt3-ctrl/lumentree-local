@@ -95,3 +95,24 @@ def test_realtime_sensor_keys_are_defined():
     assert KEY_BATTERY_SOC == "battery_soc"
     assert KEY_AC_OUT_VA == "ac_out_va"
     assert KEY_DAILY_PV_KWH == "daily_pv_kwh"
+
+
+def test_register_map_uses_real_lumentree_addresses():
+    from custom_components.lumentree_local.const import REG_ADDR
+
+    assert REG_ADDR["BATTERY_VOLTAGE"] == 11
+    assert REG_ADDR["BATTERY_CURRENT"] == 12
+    assert REG_ADDR["AC_OUT_VOLTAGE"] == 13
+    assert REG_ADDR["AC_OUT_FREQ"] == 16
+    assert REG_ADDR["AC_OUT_POWER"] == 18
+    assert REG_ADDR["PV1_VOLTAGE"] == 20
+    assert REG_ADDR["PV1_CURRENT"] == 21
+    assert REG_ADDR["PV1_POWER"] == 22
+    assert REG_ADDR["BATTERY_SOC"] == 50
+    assert REG_ADDR["GRID_POWER"] == 59
+    assert REG_ADDR["BATTERY_POWER"] == 61
+    assert REG_ADDR["AC_OUT_CURRENT"] == 62
+    assert REG_ADDR["AC_OUT_VA"] == 63
+    assert REG_ADDR["LOAD_POWER"] == 67
+    assert REG_ADDR["DAILY_LOAD_KWH"] == 69
+    assert REG_ADDR["MONTHLY_GRID_IN_KWH"] == 34

@@ -72,6 +72,43 @@ KEY_MONTHLY_LOAD_KWH: Final = "monthly_load_kwh"
 KEY_MONTHLY_ESSENTIAL_KWH: Final = "monthly_essential_kwh"
 KEY_TOTAL_LOAD_POWER: Final = "total_load_power"
 
-REG_ADDR: Final = {}
+REG_ADDR: Final = {
+    "FIRMWARE_VERSION": 2,
+    "DEVICE_MODEL_START": 3,
+    "CONTROLLER_VERSION": 8,
+    "BATTERY_VOLTAGE": 11,
+    "BATTERY_CURRENT": 12,
+    "AC_OUT_VOLTAGE": 13,
+    "GRID_VOLTAGE": 15,
+    "AC_OUT_FREQ": 16,
+    "AC_IN_FREQ": 17,
+    "AC_OUT_POWER": 18,
+    "PV1_VOLTAGE": 20,
+    "PV1_CURRENT": 21,
+    "PV1_POWER": 22,
+    "DEVICE_TEMP": 24,
+    "MPPT_TEMP": 25,
+    "DAILY_PV_KWH": 33,
+    "BATTERY_TYPE": 37,
+    "DAILY_CHARGE_KWH": 41,
+    "DAILY_DISCHARGE_KWH": 42,
+    "DAILY_ESSENTIAL_KWH": 47,
+    "BATTERY_SOC": 50,
+    "AC_IN_POWER": 53,
+    "AC_IN_CURRENT": 54,
+    "GRID_POWER": 59,
+    "BATTERY_POWER": 61,
+    "AC_OUT_CURRENT": 62,
+    "AC_OUT_VA": 63,
+    "LOAD_POWER": 67,
+    "UPS_MODE": 68,
+    "DAILY_LOAD_KWH": 69,
+    "MASTER_SLAVE_STATUS": 70,
+    "PV2_VOLTAGE": 72,
+    "PV2_POWER": 60,
+    "MONTHLY_GRID_IN_KWH": 34,
+    "MONTHLY_LOAD_KWH": 51,
+    "MONTHLY_ESSENTIAL_KWH": 64,
+}
 REG_ADDR_CELL_START: Final = 0
 REG_ADDR_CELL_COUNT: Final = 0
