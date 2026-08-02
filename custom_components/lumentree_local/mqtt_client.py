@@ -374,7 +374,14 @@ class LumentreeMqttClient:
         if interval is not None:
             self._poll_interval = interval
         if self._poll_task is not None and not self._poll_task.done():
+            _LOGGER.debug("MQTT polling already running for %s interval=%ss", self._client_id, self._poll_interval)
             return
+        _LOGGER.info(
+            "Starting MQTT poll loop for %s: topic=%s interval=%ss",
+            self._client_id,
+            self._topic_pub,
+            self._poll_interval,
+        )
         self._poll_task = self.hass.async_create_task(self._poll_loop())
 
     async def stop_polling(self) -> None:
@@ -387,13 +394,15 @@ class LumentreeMqttClient:
             self._poll_task = None
 
     async def _poll_loop(self) -> None:
+        poll_count = 0
         while not self._stopping:
             if self._is_connected and self._mqttc:
-                _LOGGER.debug(
-                    "MQTT poll tick for %s: sending read request to %s every %ss",
+                poll_count += 1
+                _LOGGER.info(
+                    "MQTT poll tick #%s for %s: sending read request to %s",
+                    poll_count,
                     self._client_id,
                     self._topic_pub,
-                    self._poll_interval,
                 )
                 await self.async_request_data()
             try:
@@ -412,6 +421,12 @@ class LumentreeMqttClient:
             if topic in self._topic_subs or topic.endswith(f"/{self._device_sn}"):
                 parsed_data = parse_mqtt_payload(payload_hex)
                 if parsed_data:
+                    _LOGGER.info(
+                        "MQTT response parsed for %s on topic=%s keys=%s",
+                        self._client_id,
+                        topic,
+                        sorted(parsed_data.keys())[:20],
+                    )
                     if not self._online:
                         self._online = True
                         parsed_data[KEY_ONLINE_STATUS] = True
@@ -421,6 +436,14 @@ class LumentreeMqttClient:
                     if callable(self.callback):
                         self.hass.loop.call_soon_threadsafe(self.callback, parsed_data)
                     self.hass.loop.call_soon_threadsafe(self._queue_update, parsed_data)
+                else:
+                    _LOGGER.warning(
+                        "MQTT payload received but not parsed for %s topic=%s len=%s payload=%s",
+                        self._client_id,
+                        topic,
+                        len(payload_bytes),
+                        payload_hex[:120],
+                    )
             else:
                 _LOGGER.warning("Unexpected topic %s: %s", self._client_id, topic)
         except Exception as exc:
