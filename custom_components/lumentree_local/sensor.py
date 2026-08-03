@@ -68,7 +68,7 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:battery",
     ),
-    LumentreeSensorEntityDescription(
+    SensorEntityDescription(
         key=KEY_DAILY_GRID_IN_KWH,
         translation_key="daily_grid_in",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
