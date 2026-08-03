@@ -64,10 +64,10 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data = payload.copy()
 
         # Calculate daily grid import energy (kWh)
-        device_id = data.get(KEY_MQTT_DEVICE_SN)
+        device_id = self.entry.unique_id or self.entry.entry_id
         grid_power = data.get(KEY_GRID_POWER)
 
-        if device_id and grid_power is not None:
+        if grid_power is not None:
             now = dt_util.now()
 
             if device_id not in self._daily_grid_in:
