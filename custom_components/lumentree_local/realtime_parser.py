@@ -44,6 +44,7 @@ from .const import (
     KEY_MONTHLY_GRID_IN_KWH,
     KEY_MONTHLY_LOAD_KWH,
     KEY_MONTHLY_ESSENTIAL_KWH,
+    KEY_TOTAL_LOAD_POWER,
 )
 
 import crcmod.predefined
@@ -445,6 +446,10 @@ def parse_mqtt_payload(ph: str) -> Optional[Dict[str, Any]]:
         ac_out_p = rr("AC_OUT_POWER", False)
         if ac_out_p is not None:
             parsed_data[KEY_AC_OUT_POWER] = ac_out_p
+
+        # Total load power
+        if load_p is not None and ac_out_p is not None:
+            parsed_data["total_load_power"] = round(load_p + ac_out_p, 2)
 
         # Battery power and status (inverted to match card convention)
         # Positive = Charging, Negative = Discharging (for card compatibility)
