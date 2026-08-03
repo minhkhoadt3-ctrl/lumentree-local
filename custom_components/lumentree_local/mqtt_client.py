@@ -446,6 +446,9 @@ class LumentreeMqttClient:
         try:
             payload_bytes = msg.payload
             payload_hex = "".join(f"{b:02x}" for b in payload_bytes) if payload_bytes else ""
+            # Chỉ xử lý dữ liệu phản hồi từ inverter
+            if not topic.startswith("reportApp"):
+                return
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 _LOGGER.debug("MQTT message received %s: topic='%s', payload='%s...' (len: %s)", self._client_id, topic, payload_hex[:60], len(payload_bytes))
 
