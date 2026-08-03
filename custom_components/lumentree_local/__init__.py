@@ -11,12 +11,8 @@ except ModuleNotFoundError:  # pragma: no cover - used when the package is impor
 
 from .const import CONF_DEVICE_SN, DOMAIN, PLATFORMS
 
-try:  # pragma: no cover - only exists in Home Assistant runtime
-    from .coordinator import LumentreeCoordinator
-    from .mqtt_client import LumentreeMqttClient
-except ModuleNotFoundError:  # pragma: no cover - used by tests / local tooling
-    LumentreeCoordinator = None
-    LumentreeMqttClient = None
+from .coordinator import LumentreeCoordinator
+from .mqtt_client import LumentreeMqttClient
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -27,8 +23,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the component from a config entry without polling."""
-    if LumentreeCoordinator is None or LumentreeMqttClient is None:
-        raise RuntimeError("Home Assistant is required to set up this integration")
 
     coordinator = LumentreeCoordinator(hass, entry)
     device_sn = str(entry.data.get(CONF_DEVICE_SN, entry.title or "lumentree")).strip() or "lumentree"
