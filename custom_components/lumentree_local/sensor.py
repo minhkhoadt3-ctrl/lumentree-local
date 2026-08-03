@@ -70,7 +70,7 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     ),
     SensorEntityDescription(
         key=KEY_DAILY_GRID_IN_KWH,
-        translation_key="daily_grid_in",
+        name="Grid Input Today",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
