@@ -92,8 +92,11 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._daily_grid_in[device_id],
                 3,
             )
-        self.device_state = payload.copy()
-        self.data = payload.copy()
+        _LOGGER.warning("Coordinator data keys: %s", list(data.keys()))
+        #self.device_state = payload.copy()
+        #self.data = payload.copy()
+        self.device_state = data.copy()
+        self.data = data
         self.async_set_updated_data(self.data)
 
     async def _async_update_data(self) -> dict[str, Any]:
