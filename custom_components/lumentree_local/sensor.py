@@ -73,7 +73,7 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
+        #entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
         key=KEY_AC_OUT_VA,
@@ -138,7 +138,7 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
+        #entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
         key=KEY_PV1_CURRENT,
@@ -181,7 +181,7 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
+        #entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
         key=KEY_BATTERY_CURRENT,
@@ -280,21 +280,14 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
 )
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities: AddEntitiesCallback, discovery_info=None):
+async def async_setup_entry(hass, config_entry, async_add_entities,):
     """Set up sensor entities from the config entry."""
-    coordinator: LumentreeCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    descriptions = [
-        SensorEntityDescription(key=ATTR_DEVICE_NAME, name="Device Name"),
-        SensorEntityDescription(key=ATTR_BATTERY, name="Battery", native_unit_of_measurement=PERCENTAGE, device_class=SensorDeviceClass.BATTERY),
-        SensorEntityDescription(key=ATTR_TEMPERATURE, name="Temperature", native_unit_of_measurement=UnitOfTemperature.CELSIUS, device_class=SensorDeviceClass.TEMPERATURE),
-        SensorEntityDescription(key=ATTR_HUMIDITY, name="Humidity", native_unit_of_measurement=PERCENTAGE, device_class=SensorDeviceClass.HUMIDITY),
-        SensorEntityDescription(key=ATTR_POWER, name="Power", native_unit_of_measurement=UnitOfPower.WATT, device_class=SensorDeviceClass.POWER),
-    ]
-    entities = [
-        LumentreeSensor(coordinator, description)
-        for description in (*descriptions, *REALTIME_SENSOR_DESCRIPTIONS)
-    ]
-    async_add_entities(entities)
+    coordinator: LumentreeCoordinator = hass.data[DOMAIN][config_entry.entry_id]      
+    
+    async_add_entities(
+        LumentreeSensor(coordinator, desc)
+        for desc in REALTIME_SENSOR_DESCRIPTIONS
+    )
 
 
 class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], SensorEntity):
