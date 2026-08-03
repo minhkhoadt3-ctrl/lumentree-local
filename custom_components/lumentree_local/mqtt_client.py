@@ -232,7 +232,7 @@ class LumentreeMqttClient:
     def _set_offline(self, gen: int = -1, *args) -> None:
         if gen >= 0 and gen != self._offline_timer_gen:
             return
-        _LOGGER.info("MQTT data timeout or disconnect %s. Setting offline.", self._client_id)
+        _LOGGER.debug("MQTT data timeout or disconnect %s. Setting offline.", self._client_id)
         self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
         if self._online:
             self._online = False
@@ -264,7 +264,7 @@ class LumentreeMqttClient:
 
             host = self.entry.data.get(CONF_HOST, MQTT_BROKER)
             port = int(self.entry.data.get(CONF_PORT, MQTT_PORT))
-            _LOGGER.info("MQTT connecting: %s:%s (Client: %s) for SN: %s", host, port, self._client_id, self._device_sn)
+            _LOGGER.debug("MQTT connecting: %s:%s (Client: %s) for SN: %s", host, port, self._client_id, self._device_sn)
 
             try:
                 await self.hass.async_add_executor_job(self._mqttc.connect, host, port, MQTT_KEEPALIVE)
@@ -294,7 +294,7 @@ class LumentreeMqttClient:
 
     def _on_connect(self, client, userdata, flags, rc, properties=None) -> None:
         if rc == paho.CONNACK_ACCEPTED:
-            _LOGGER.info("MQTT connected (rc=%s) %s. Subscribing to: %s", rc, self._client_id, self._topic_subs)
+            _LOGGER.debug("MQTT connected (rc=%s) %s. Subscribing to: %s", rc, self._client_id, self._topic_subs)
             self._reconnect_attempts = 0
             try:
                 for sub_topic in self._topic_subs:
@@ -324,11 +324,11 @@ class LumentreeMqttClient:
         self.hass.loop.call_soon_threadsafe(self._set_offline)
 
         if rc == 0 and self._stopping:
-            _LOGGER.info("MQTT clean disconnect %s (rc=%s)", self._client_id, rc)
+            _LOGGER.debug("MQTT clean disconnect %s (rc=%s)", self._client_id, rc)
             return
 
         if rc == 0:
-            _LOGGER.info("MQTT connection closed cleanly %s (rc=%s)", self._client_id, rc)
+            _LOGGER.debug("MQTT connection closed cleanly %s (rc=%s)", self._client_id, rc)
             return
 
         _LOGGER.warning("MQTT unexpected disconnect %s (rc=%s)", self._client_id, rc)
@@ -353,7 +353,7 @@ class LumentreeMqttClient:
 
         self._reconnect_attempts += 1
         delay = min(RECONNECT_DELAY_SECONDS * (2 ** (self._reconnect_attempts - 1)), 60)
-        _LOGGER.info("Scheduling MQTT reconnect %s/%s for %s in %ss", self._reconnect_attempts, MAX_RECONNECT_ATTEMPTS, self._client_id, delay)
+        _LOGGER.debug("Scheduling MQTT reconnect %s/%s for %s in %ss", self._reconnect_attempts, MAX_RECONNECT_ATTEMPTS, self._client_id, delay)
         self.hass.loop.call_soon_threadsafe(
             lambda: self.hass.async_create_task(self._async_reconnect(delay))
         )
@@ -377,7 +377,7 @@ class LumentreeMqttClient:
                 _LOGGER.warning("MQTT soft reconnect failed %s: %s", self._client_id, exc)
 
     async def _hard_reconnect(self) -> None:
-        _LOGGER.info("MQTT hard reconnect: creating fresh connection %s", self._client_id)
+        _LOGGER.debug("MQTT hard reconnect: creating fresh connection %s", self._client_id)
         old_mqttc = self._mqttc
         self._mqttc = None
         self._cancel_batch_timer()
@@ -409,7 +409,7 @@ class LumentreeMqttClient:
         if self._poll_task is not None and not self._poll_task.done():
             _LOGGER.debug("MQTT polling already running for %s interval=%ss", self._client_id, self._poll_interval)
             return
-        _LOGGER.info(
+        _LOGGER.debug(
             "Starting MQTT poll loop for %s: topic=%s interval=%ss",
             self._client_id,
             self._topic_pub,
@@ -431,7 +431,7 @@ class LumentreeMqttClient:
         while not self._stopping:
             if self._is_connected and self._mqttc:
                 poll_count += 1
-                _LOGGER.info(
+                _LOGGER.debug(
                     "MQTT poll tick #%s for %s: sending read request to %s",
                     poll_count,
                     self._client_id,
@@ -467,7 +467,7 @@ class LumentreeMqttClient:
             if topic_is_device_related:
                 parsed_data = parse_mqtt_payload(payload_hex)
                 if parsed_data:
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "MQTT response parsed for %s on topic=%s keys=%s",
                         self._client_id,
                         topic,
@@ -536,7 +536,7 @@ class LumentreeMqttClient:
         num_registers = NUM_MAIN_REGISTERS_TO_READ
         command_hex = generate_modbus_read_command(slave_id, func_code, start_address, num_registers)
         if command_hex:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Requesting inverter data %s: topic=%s start=%s count=%s frame=%s",
                 self._client_id,
                 self._topic_pub,
@@ -560,7 +560,7 @@ class LumentreeMqttClient:
             _LOGGER.error("Failed to generate Modbus read (%s-%s) %s", start, start + count - 1, self._client_id)
 
     async def disconnect(self) -> None:
-        _LOGGER.info("Disconnecting MQTT %s", self._client_id)
+        _LOGGER.debug("Disconnecting MQTT %s", self._client_id)
         self._stopping = True
         self._reconnect_attempts = MAX_RECONNECT_ATTEMPTS
         self._connected_event.set()
@@ -584,6 +584,6 @@ class LumentreeMqttClient:
                     _LOGGER.warning("Error unsubscribing from %s %s: %s", self._topic_sub, self._client_id, unsub_exc)
                 await self.hass.async_add_executor_job(mqttc_to_disconnect.loop_stop)
                 await self.hass.async_add_executor_job(mqttc_to_disconnect.disconnect)
-                _LOGGER.info("MQTT client disconnected %s", self._client_id)
+                _LOGGER.debug("MQTT client disconnected %s", self._client_id)
             except Exception as exc:
                 _LOGGER.warning("Error during MQTT disconnect %s: %s", self._client_id, exc)
