@@ -45,6 +45,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_PORT,
     CONF_USERNAME,
+    CONF_POLLING,
     DEFAULT_POLLING_INTERVAL,
     DOMAIN,
     KEY_LAST_RAW_MQTT,
@@ -137,7 +138,10 @@ class LumentreeMqttClient:
             )
         )
         self._poll_task: Optional[asyncio.Task[None]] = None
-        self._poll_interval = DEFAULT_POLLING_INTERVAL
+        #self._poll_interval = DEFAULT_POLLING_INTERVAL
+        self._poll_interval = float(
+            entry.data.get(CONF_POLLING, DEFAULT_POLLING_INTERVAL)
+        )
 
         self._connect_lock = asyncio.Lock()
         self._reconnect_attempts = 0
@@ -275,7 +279,7 @@ class LumentreeMqttClient:
                     raise ConnectionRefusedError("MQTT connection timeout")
 
                 if self._is_connected:
-                    self.start_polling(self._poll_interval)
+                    self.start_polling()
             except Exception as exc:
                 _LOGGER.error("Failed MQTT connect %s: %s", self._client_id, exc)
                 if self._mqttc:
