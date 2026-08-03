@@ -133,8 +133,6 @@ class LumentreeMqttClient:
                 [
                     self._topic_sub,
                     f"reportApp/{self._device_sn}",
-                    "reportApp/#",
-                    "listenApp/#",
                 ]
             )
         )
