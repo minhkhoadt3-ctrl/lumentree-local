@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Any
 
 try:  # pragma: no cover - Home Assistant runtime only
@@ -22,7 +22,12 @@ except ModuleNotFoundError:  # pragma: no cover - local/unit-test environment
         def async_set_updated_data(self, data):
             self.data = data
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    KEY_GRID_POWER,
+    KEY_MQTT_DEVICE_SN,
+    KEY_DAILY_GRID_IN_KWH,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +46,11 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_update: datetime | None = None
         self.device_state: dict[str, Any] = {}
         self.data: dict[str, Any] = {}
+        
+        # Daily grid import energy accumulator
+        self._daily_grid_in: dict[str, float] = {}
+        self._last_grid_ts: dict[str, datetime] = {}
+        self._grid_day: dict[str, date] = {}
 
     def update_from_payload(self, payload: dict[str, Any]) -> None:
         """Accept parser output and publish it to Home Assistant without polling."""
@@ -50,6 +60,37 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.last_payload = payload
         self.last_update = datetime.now(timezone.utc)
+        data = payload.copy()
+
+        # Calculate daily grid import energy (kWh)
+        device_id = data.get(KEY_MQTT_DEVICE_SN)
+        grid_power = data.get(KEY_GRID_POWER)
+
+        if device_id and grid_power is not None:
+            now = datetime.now(timezone.utc)
+
+            if device_id not in self._daily_grid_in:
+                self._daily_grid_in[device_id] = 0.0
+                self._last_grid_ts[device_id] = now
+                self._grid_day[device_id] = now.date()
+
+            # reset at new day
+            if now.date() != self._grid_day[device_id]:
+                self._daily_grid_in[device_id] = 0.0
+                self._grid_day[device_id] = now.date()
+
+            dt = (now - self._last_grid_ts[device_id]).total_seconds()
+            self._last_grid_ts[device_id] = now
+
+            if dt > 0:
+                self._daily_grid_in[device_id] += (
+                    max(float(grid_power), 0) * dt / 3600000
+                )
+
+            data[KEY_DAILY_GRID_IN_KWH] = round(
+                self._daily_grid_in[device_id],
+                3,
+            )
         self.device_state = payload.copy()
         self.data = payload.copy()
         self.async_set_updated_data(self.data)
