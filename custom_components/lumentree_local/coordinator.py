@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone, date
+from homeassistant.util import dt as dt_util
 from typing import Any
 
 try:  # pragma: no cover - Home Assistant runtime only
@@ -59,7 +60,7 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         self.last_payload = payload
-        self.last_update = datetime.now(timezone.utc)
+        self.last_update = dt_util.now()
         data = payload.copy()
 
         # Calculate daily grid import energy (kWh)
@@ -67,7 +68,7 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         grid_power = data.get(KEY_GRID_POWER)
 
         if device_id and grid_power is not None:
-            now = datetime.now(timezone.utc)
+            now = dt_util.now()
 
             if device_id not in self._daily_grid_in:
                 self._daily_grid_in[device_id] = 0.0
@@ -84,7 +85,7 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             if dt > 0:
                 self._daily_grid_in[device_id] += (
-                    max(float(grid_power), 0) * dt / 3600000
+                    abs(float(grid_power)) * dt / 3600000
                 )
 
             data[KEY_DAILY_GRID_IN_KWH] = round(
