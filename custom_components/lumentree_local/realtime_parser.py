@@ -15,7 +15,7 @@ import struct
 import math
 import time
 
-from ..const import (
+from .const import (
     REG_ADDR,
     KEY_ONLINE_STATUS,
     KEY_BATTERY_POWER,
