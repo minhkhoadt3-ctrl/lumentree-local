@@ -45,6 +45,7 @@ from .const import (
     KEY_DAILY_LOAD_KWH,
     KEY_DAILY_PV_KWH,
     KEY_DAILY_TOTAL_LOAD_KWH,
+    KEY_DAILY_GRID_IN_KWH,
     KEY_DEVICE_TEMP,
     KEY_GRID_POWER,
     KEY_LOAD_POWER,
@@ -66,6 +67,15 @@ REALTIME_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:battery",
+    ),
+    LumentreeSensorEntityDescription(
+        key=KEY_DAILY_GRID_IN_KWH,
+        translation_key="daily_grid_in",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        icon="mdi:transmission-tower-import",
     ),
     SensorEntityDescription(
         key=KEY_PV2_POWER,
