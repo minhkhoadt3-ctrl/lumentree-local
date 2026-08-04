@@ -21,6 +21,7 @@ from homeassistant.const import (
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     ATTR_BATTERY,
@@ -300,7 +301,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities,):
     )
 
 
-class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], SensorEntity):
+class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], RestoreEntity, SensorEntity):
     """Sensor entity reflecting local device state."""
 
     _attr_has_entity_name = True
@@ -334,7 +335,23 @@ class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], SensorEntity):
     @property
     def should_poll(self) -> bool:
         return False
+    async def async_added_to_hass(self):
+        """Restore daily_grid_in value after Home Assistant restart."""
+        await super().async_added_to_hass()
 
+        if self.entity_description.key != KEY_DAILY_GRID_IN_KWH:
+            return
+
+        last_state = await self.async_get_last_state()
+        if last_state is None:
+            return
+
+        try:
+            self.coordinator._daily_grid_in[
+                self.coordinator.entry.unique_id or self.coordinator.entry.entry_id
+            ] = float(last_state.state)
+        except (ValueError, TypeError):
+            pass
     async def async_update(self) -> None:
         """No polling: entity state is refreshed only when MQTT parser pushes new data."""
         return None
