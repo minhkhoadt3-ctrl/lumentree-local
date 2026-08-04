@@ -230,12 +230,14 @@ class LumentreeMqttClient:
             _LOGGER.error("Error in batch update processing: %s", exc)
         finally:
             self._batch_timer = None
+
     def _queue_update(self, data: Dict[str, Any]) -> None:
         """Đưa cập nhật dữ liệu vào hàng đợi một cách Thread-Safe."""
         def _do_queue():
             self._pending_updates.update(data)
             if self._batch_timer is None or self._batch_timer.done():
-                self._batch_timer = self.hass.async_create_task(self._process_batch_updates())
+                # ĐÃ SỬA: Dùng loop.create_task để tách biệt khỏi tiến trình Bootstrap HA
+                self._batch_timer = self.hass.loop.create_task(self._process_batch_updates())
 
         self.hass.loop.call_soon_threadsafe(_do_queue)
 
@@ -369,8 +371,9 @@ class LumentreeMqttClient:
         self._reconnect_attempts += 1
         delay = min(RECONNECT_DELAY_SECONDS * (2 ** (self._reconnect_attempts - 1)), 60)
         _LOGGER.debug("Scheduling MQTT reconnect %s/%s for %s in %ss", self._reconnect_attempts, MAX_RECONNECT_ATTEMPTS, self._client_id, delay)
+        # ĐÃ SỬA: Dùng loop.create_task cho reconnect task
         self.hass.loop.call_soon_threadsafe(
-            lambda: self.hass.async_create_task(self._async_reconnect(delay))
+            lambda: self.hass.loop.create_task(self._async_reconnect(delay))
         )
 
     async def _async_reconnect(self, delay: float) -> None:
@@ -405,7 +408,8 @@ class LumentreeMqttClient:
             self._topic_pub,
             self._poll_interval,
         )
-        self._poll_task = self.hass.async_create_task(self._poll_loop())
+        # ĐÃ SỬA LỖI TREO: Dùng self.hass.loop.create_task để tách khỏi Bootstrap tracker của HA
+        self._poll_task = self.hass.loop.create_task(self._poll_loop())
 
     async def stop_polling(self) -> None:
         if self._poll_task is not None:
