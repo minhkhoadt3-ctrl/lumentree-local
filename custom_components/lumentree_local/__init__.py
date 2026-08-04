@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 try:
@@ -10,9 +11,10 @@ except ModuleNotFoundError:  # pragma: no cover - used when the package is impor
     HomeAssistant = Any
 
 from .const import CONF_DEVICE_SN, DOMAIN, PLATFORMS
-
 from .coordinator import LumentreeCoordinator
 from .mqtt_client import LumentreeMqttClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -22,17 +24,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up the component from a config entry without polling."""
+    """Set up the component from a config entry without blocking HA startup."""
 
     coordinator = LumentreeCoordinator(hass, entry)
     device_sn = str(entry.data.get(CONF_DEVICE_SN, entry.title or "lumentree")).strip() or "lumentree"
 
+    # Tránh truyền callback nếu coordinator cập nhật qua dispatcher signal
     mqtt_client = LumentreeMqttClient(
         hass,
         entry,
         device_sn=device_sn,
         device_id=entry.entry_id,
-        callback=coordinator.update_from_payload,
+        callback=getattr(coordinator, "update_from_payload", None),
     )
     mqtt_client.subscribe(mqtt_client.topic_subs)
     coordinator.mqtt_client = mqtt_client
@@ -41,10 +44,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
     hass.data[DOMAIN][f"{entry.entry_id}_mqtt"] = mqtt_client
 
-    #await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    #await mqtt_client.connect()
+    # 1. Forward setup các platform (sensors,...) trước
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    hass.async_create_task(mqtt_client.connect())
+
+    # 2. CHÚ Ý: Dùng hass.loop.create_task để chạy connect ở background
+    # Giúp Home Assistant hoàn tất khởi động (Ready) ngay lập tức mà không bị kẹt
+    hass.loop.create_task(mqtt_client.connect())
+
     return True
 
 
