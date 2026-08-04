@@ -48,13 +48,13 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_state: dict[str, Any] = {}
         self.data: dict[str, Any] = {}
         
-        # Lấy device_sn từ ConfigEntry để dùng trong update_from_payload
-        self._device_sn = entry.data.get("device_sn")
+        # Lấy device_sn từ ConfigEntry
+        self._device_sn = entry.data.get("device_sn") or entry.entry_id
         
-        # Daily grid import energy accumulator
-        self._daily_grid_in: dict[str, float] = {}
-        self._last_grid_ts: dict[str, datetime] = {}
-        self._grid_day: dict[str, date] = {}
+        # Daily grid energy accumulator
+        self._daily_grid_in: float = 0.0
+        self._last_grid_ts: datetime | None = None
+        self._grid_day: date | None = None
 
     def update_from_payload(self, payload: dict) -> None:
         """Cập nhật dữ liệu sensor an toàn từ MQTT payload."""
@@ -70,7 +70,6 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._device_sn and self._device_sn in payload:
             data_to_update = payload[self._device_sn]
         else:
-            # Tự động phát hiện nếu key đầu tiên là chuỗi IP/PORT (ví dụ: '192.168.100.70:1886:...')
             first_key = next(iter(payload.keys())) if payload else None
             if first_key and isinstance(first_key, str) and ":" in first_key and isinstance(payload[first_key], dict):
                 data_to_update = payload[first_key]
@@ -78,6 +77,30 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Cập nhật dữ liệu mới vào coordinator
         if isinstance(data_to_update, dict):
             self.data.update(data_to_update)
+
+            # --- TÍNH TOÁN TÍCH LŨY LƯỚI TRONG NGÀY (CẢ CHIỀU RA VÀ VÀO) ---
+            now = dt_util.now()
+            
+            # Reset chỉ số về 0 khi sang ngày mới
+            if self._grid_day is None or self._grid_day != now.date():
+                self._grid_day = now.date()
+                self._daily_grid_in = 0.0
+                self._last_grid_ts = now
+
+            # Tích lũy toàn bộ công suất lưới (dùng abs để lấy cả chiều âm lẫn dương)
+            grid_power = data_to_update.get(KEY_GRID_POWER)
+            if grid_power is not None and self._last_grid_ts is not None:
+                time_diff = (now - self._last_grid_ts).total_seconds()
+                # Chỉ tính khi khoảng thời gian hợp lý (dưới 10 phút)
+                if 0 < time_diff < 600:
+                    # Dùng abs(grid_power) để tính tổng công suất trao đổi với lưới
+                    energy_kwh = (abs(grid_power) * time_diff) / 3600000.0
+                    self._daily_grid_in += energy_kwh
+            
+            self._last_grid_ts = now
+
+            # Ghi đè/Cập nhật giá trị tính toán vào key năng lượng ngày
+            self.data[KEY_DAILY_GRID_IN_KWH] = round(self._daily_grid_in, 3)
 
         # BẮT BUỘC: Thông báo cho Home Assistant cập nhật trạng thái các sensor
         self.async_set_updated_data(self.data)
