@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 import time
 from functools import partial
 from typing import Any, Callable, Dict, Optional
@@ -94,7 +93,6 @@ class LumentreeMqttClient:
         "_reconnect_attempts",
         "_is_connected",
         "_stopping",
-        "_stopping_lock",
         "_connected_event",
         "_online",
         "_offline_timer_unsub",
@@ -138,7 +136,6 @@ class LumentreeMqttClient:
             )
         )
         self._poll_task: Optional[asyncio.Task[None]] = None
-        #self._poll_interval = DEFAULT_POLLING_INTERVAL
         self._poll_interval = float(
             entry.data.get(CONF_POLLING, DEFAULT_POLLING_INTERVAL)
         )
@@ -147,7 +144,6 @@ class LumentreeMqttClient:
         self._reconnect_attempts = 0
         self._is_connected = False
         self._stopping = False
-        self._stopping_lock = threading.Lock()
         self._connected_event = asyncio.Event()
         self._online = False
         self._offline_timer_unsub: Optional[Callable] = None
@@ -186,6 +182,7 @@ class LumentreeMqttClient:
                 _LOGGER.warning("MQTT subscribe failed %s: %s", self._client_id, exc)
 
     def _cancel_offline_timer(self) -> None:
+        """Nên chạy trên thread asyncio chính."""
         if self._offline_timer_unsub:
             try:
                 self._offline_timer_unsub()
@@ -194,6 +191,7 @@ class LumentreeMqttClient:
             self._offline_timer_unsub = None
 
     def _cancel_batch_timer(self) -> None:
+        """Nên chạy trên thread asyncio chính."""
         if self._batch_timer is not None:
             try:
                 self._batch_timer.cancel()
@@ -201,50 +199,57 @@ class LumentreeMqttClient:
                 _LOGGER.warning("Error cancelling batch timer %s: %s", self._client_id, exc)
             self._batch_timer = None
 
-    async def _start_batch_timer(self) -> None:
-        if self._batch_timer is not None:
-            self._batch_timer.cancel()
-        self._batch_timer = asyncio.create_task(self._process_batch_updates())
-
     async def _process_batch_updates(self) -> None:
         try:
             await asyncio.sleep(0.1)
             if self._pending_updates:
-                async_dispatcher_send(self.hass, self._signal_update, self._pending_updates.copy())
+                updates = self._pending_updates.copy()
                 self._pending_updates.clear()
+                if callable(self.callback):
+                    self.callback(updates)
+                async_dispatcher_send(self.hass, self._signal_update, updates)
         except asyncio.CancelledError:
             if self._pending_updates:
-                async_dispatcher_send(self.hass, self._signal_update, self._pending_updates.copy())
+                updates = self._pending_updates.copy()
                 self._pending_updates.clear()
+                if callable(self.callback):
+                    self.callback(updates)
+                async_dispatcher_send(self.hass, self._signal_update, updates)
         except Exception as exc:
             _LOGGER.error("Error in batch update processing: %s", exc)
         finally:
             self._batch_timer = None
 
     def _queue_update(self, data: Dict[str, Any]) -> None:
-        self._pending_updates.update(data)
-        if self._batch_timer is None:
-            self.hass.loop.call_soon_threadsafe(
-                lambda: self.hass.async_create_task(self._start_batch_timer())
-            )
+        """Đưa cập nhật dữ liệu vào hàng đợi một cách Thread-Safe."""
+        def _do_queue():
+            self._pending_updates.update(data)
+            if self._batch_timer is None or self._batch_timer.done():
+                self._batch_timer = self.hass.async_create_task(self._process_batch_updates())
+
+        self.hass.loop.call_soon_threadsafe(_do_queue)
 
     @callback
     def _set_offline(self, gen: int = -1, *args) -> None:
         if gen >= 0 and gen != self._offline_timer_gen:
             return
         _LOGGER.debug("MQTT data timeout or disconnect %s. Setting offline.", self._client_id)
-        self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
+        self._cancel_offline_timer()
         if self._online:
             self._online = False
             async_dispatcher_send(self.hass, self._signal_update, {KEY_ONLINE_STATUS: False})
 
     def _start_offline_timer(self) -> None:
-        self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
-        self._offline_timer_gen += 1
-        gen = self._offline_timer_gen
-        self._offline_timer_unsub = async_call_later(
-            self.hass, OFFLINE_TIMEOUT_SECONDS, lambda _now: self._set_offline(gen)
-        )
+        """Thread-safe method để đặt lại timer offline."""
+        def _schedule():
+            self._cancel_offline_timer()
+            self._offline_timer_gen += 1
+            gen = self._offline_timer_gen
+            self._offline_timer_unsub = async_call_later(
+                self.hass, OFFLINE_TIMEOUT_SECONDS, lambda _now: self._set_offline(gen)
+            )
+
+        self.hass.loop.call_soon_threadsafe(_schedule)
 
     async def connect(self) -> None:
         async with self._connect_lock:
@@ -375,32 +380,7 @@ class LumentreeMqttClient:
                 await self.hass.async_add_executor_job(self._mqttc.reconnect)
             except Exception as exc:
                 _LOGGER.warning("MQTT soft reconnect failed %s: %s", self._client_id, exc)
-
-    async def _hard_reconnect(self) -> None:
-        _LOGGER.debug("MQTT hard reconnect: creating fresh connection %s", self._client_id)
-        old_mqttc = self._mqttc
-        self._mqttc = None
-        self._cancel_batch_timer()
-        self._pending_updates.clear()
-        if old_mqttc:
-            try:
-                old_mqttc.loop_stop()
-            except Exception:
-                pass
-            try:
-                old_mqttc.disconnect()
-            except Exception:
-                pass
-        self._is_connected = False
-        self._connected_event.clear()
-        self._stopping = False
-        try:
-            await self.connect()
-        except Exception as exc:
-            _LOGGER.error("MQTT hard reconnect failed %s: %s", self._client_id, exc)
-            self._stopping = False
-            self._reconnect_attempts = MAX_RECONNECT_ATTEMPTS
-            self._schedule_reconnect()
+                self._schedule_reconnect()
 
     def start_polling(self, interval: float | None = None) -> None:
         """Start a periodic read request loop to trigger reportApp responses."""
@@ -448,7 +428,7 @@ class LumentreeMqttClient:
         try:
             payload_bytes = msg.payload
             payload_hex = "".join(f"{b:02x}" for b in payload_bytes) if payload_bytes else ""
-            # Chỉ xử lý dữ liệu phản hồi từ inverter
+            
             if not topic.startswith("reportApp"):
                 return
             if _LOGGER.isEnabledFor(logging.DEBUG):
@@ -476,12 +456,11 @@ class LumentreeMqttClient:
                     if not self._online:
                         self._online = True
                         parsed_data[KEY_ONLINE_STATUS] = True
-                    self.hass.loop.call_soon_threadsafe(self._start_offline_timer)
+                    
+                    self._start_offline_timer()
                     parsed_data[KEY_LAST_RAW_MQTT] = payload_hex
                     parsed_data["mqtt_topic"] = topic
-                    if callable(self.callback):
-                        self.hass.loop.call_soon_threadsafe(self.callback, parsed_data)
-                    self.hass.loop.call_soon_threadsafe(self._queue_update, parsed_data)
+                    self._queue_update(parsed_data)
                 else:
                     _LOGGER.warning(
                         "MQTT payload received but not parsed for %s topic=%s len=%s payload=%s",
@@ -564,10 +543,14 @@ class LumentreeMqttClient:
         self._stopping = True
         self._reconnect_attempts = MAX_RECONNECT_ATTEMPTS
         self._connected_event.set()
-        self.hass.loop.call_soon_threadsafe(self._cancel_offline_timer)
-        self._cancel_batch_timer()
+        
+        def _cleanup_timers():
+            self._cancel_offline_timer()
+            self._cancel_batch_timer()
+            self._set_offline()
+
+        self.hass.loop.call_soon_threadsafe(_cleanup_timers)
         await self.stop_polling()
-        self.hass.loop.call_soon_threadsafe(self._set_offline)
 
         mqttc_to_disconnect = None
         async with self._connect_lock:
