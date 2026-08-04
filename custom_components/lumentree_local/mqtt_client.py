@@ -205,21 +205,31 @@ class LumentreeMqttClient:
             if self._pending_updates:
                 updates = self._pending_updates.copy()
                 self._pending_updates.clear()
-                if callable(self.callback):
-                    self.callback(updates)
+                
+                # Gọi callback nếu thực sự là một function/method
+                if self.callback is not None and callable(self.callback):
+                    try:
+                        self.callback(updates)
+                    except Exception as cb_exc:
+                        _LOGGER.error("Error executing mqtt_client callback: %s", cb_exc)
+
+                # Gửi dữ liệu qua Dispatcher cho các Sensor thu thập
                 async_dispatcher_send(self.hass, self._signal_update, updates)
+
         except asyncio.CancelledError:
             if self._pending_updates:
                 updates = self._pending_updates.copy()
                 self._pending_updates.clear()
-                if callable(self.callback):
-                    self.callback(updates)
+                if self.callback is not None and callable(self.callback):
+                    try:
+                        self.callback(updates)
+                    except Exception:
+                        pass
                 async_dispatcher_send(self.hass, self._signal_update, updates)
         except Exception as exc:
             _LOGGER.error("Error in batch update processing: %s", exc)
         finally:
             self._batch_timer = None
-
     def _queue_update(self, data: Dict[str, Any]) -> None:
         """Đưa cập nhật dữ liệu vào hàng đợi một cách Thread-Safe."""
         def _do_queue():
