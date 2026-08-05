@@ -236,7 +236,6 @@ class LumentreeMqttClient:
         def _do_queue():
             self._pending_updates.update(data)
             if self._batch_timer is None or self._batch_timer.done():
-                # ĐÃ SỬA: Dùng loop.create_task để tách biệt khỏi tiến trình Bootstrap HA
                 self._batch_timer = self.hass.loop.create_task(self._process_batch_updates())
 
         self.hass.loop.call_soon_threadsafe(_do_queue)
@@ -257,8 +256,13 @@ class LumentreeMqttClient:
             self._cancel_offline_timer()
             self._offline_timer_gen += 1
             gen = self._offline_timer_gen
+
+            @callback
+            def _handle_timeout(_now):
+                self._set_offline(gen)
+
             self._offline_timer_unsub = async_call_later(
-                self.hass, OFFLINE_TIMEOUT_SECONDS, lambda _now: self._set_offline(gen)
+                self.hass, OFFLINE_TIMEOUT_SECONDS, _handle_timeout
             )
 
         self.hass.loop.call_soon_threadsafe(_schedule)
@@ -371,7 +375,6 @@ class LumentreeMqttClient:
         self._reconnect_attempts += 1
         delay = min(RECONNECT_DELAY_SECONDS * (2 ** (self._reconnect_attempts - 1)), 60)
         _LOGGER.debug("Scheduling MQTT reconnect %s/%s for %s in %ss", self._reconnect_attempts, MAX_RECONNECT_ATTEMPTS, self._client_id, delay)
-        # ĐÃ SỬA: Dùng loop.create_task cho reconnect task
         self.hass.loop.call_soon_threadsafe(
             lambda: self.hass.loop.create_task(self._async_reconnect(delay))
         )
@@ -408,7 +411,6 @@ class LumentreeMqttClient:
             self._topic_pub,
             self._poll_interval,
         )
-        # ĐÃ SỬA LỖI TREO: Dùng self.hass.loop.create_task để tách khỏi Bootstrap tracker của HA
         self._poll_task = self.hass.loop.create_task(self._poll_loop())
 
     async def stop_polling(self) -> None:
