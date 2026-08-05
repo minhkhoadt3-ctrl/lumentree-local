@@ -10,6 +10,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
     UnitOfApparentPower,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -22,7 +24,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.restore_state import RestoreEntity
-
+import homeassistant.util.dt as dt_util
 from .const import (
     ATTR_BATTERY,
     ATTR_DEVICE_NAME,
