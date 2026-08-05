@@ -78,11 +78,16 @@ class LumentreeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if isinstance(data_to_update, dict):
             self.data.update(data_to_update)
 
-            # --- TÍNH TOÁN TÍCH LŨY LƯỚI TRONG NGÀY (CẢ CHIỀU RA VÀ VÀO) ---
+           # --- TÍNH TOÁN TÍCH LŨY LƯỚI TRONG NGÀY ---
             now = dt_util.now()
-            
-            # Reset chỉ số về 0 khi sang ngày mới
-            if self._grid_day is None or self._grid_day != now.date():
+
+            # 1. Kiểm tra chuyển ngày
+            if self._grid_day is None:
+                # Nếu lần đầu nhận MQTT packet: Chỉ ghi nhận ngày, KHÔNG đè _daily_grid_in về 0
+                self._grid_day = now.date()
+                self._last_grid_ts = now
+            elif self._grid_day != now.date():
+                # Chỉ khi thực sự bước sang ngày mới (sau 00:00 AM) mới reset về 0
                 self._grid_day = now.date()
                 self._daily_grid_in = 0.0
                 self._last_grid_ts = now
