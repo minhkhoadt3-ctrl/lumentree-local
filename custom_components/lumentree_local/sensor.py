@@ -335,7 +335,7 @@ class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], RestoreEntity, Se
     @property
     def should_poll(self) -> bool:
         return False
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Restore daily_grid_in value after Home Assistant restart."""
         await super().async_added_to_hass()
 
@@ -343,13 +343,27 @@ class LumentreeSensor(CoordinatorEntity[LumentreeCoordinator], RestoreEntity, Se
             return
 
         last_state = await self.async_get_last_state()
-        if last_state is None:
+        if (
+            last_state is None
+            or last_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        ):
             return
 
         try:
-            self.coordinator._daily_grid_in[
-                self.coordinator.entry.unique_id or self.coordinator.entry.entry_id
-            ] = float(last_state.state)
+            val = float(last_state.state)
+            now = dt_util.now()
+
+            # Khôi phục trực tiếp vào biến float của Coordinator (Sửa lỗi TypeError)
+            self.coordinator._daily_grid_in = val
+            self.coordinator._grid_day = now.date()
+            self.coordinator._last_grid_ts = now
+
+            if self.coordinator.data is None:
+                self.coordinator.data = {}
+
+            self.coordinator.data[KEY_DAILY_GRID_IN_KWH] = round(val, 3)
+            self.async_write_ha_state()
+
         except (ValueError, TypeError):
             pass
     async def async_update(self) -> None:
