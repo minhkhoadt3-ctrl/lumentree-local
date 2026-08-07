@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "lumentree_local"
-PLATFORMS: Final = ["sensor"]
+PLATFORMS: Final = ["sensor", "binary_sensor"]
 
 CONF_HOST: Final = "host"
 CONF_PORT: Final = "port"
