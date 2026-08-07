@@ -74,7 +74,7 @@ KEY_MONTHLY_GRID_IN_KWH: Final = "monthly_grid_in_kwh"
 KEY_MONTHLY_LOAD_KWH: Final = "monthly_load_kwh"
 KEY_MONTHLY_ESSENTIAL_KWH: Final = "monthly_essential_kwh"
 KEY_TOTAL_LOAD_POWER: Final = "total_load_power"
-KEY_GRID_CONNECTED_STATUS = "grid_connected_status"
+KEY_GRID_CONNECTED_STATUS: Final = "grid_connected_status"
 
 REG_ADDR: Final = {
     "FIRMWARE_VERSION": 2,
