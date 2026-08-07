@@ -45,6 +45,7 @@ from .const import (
     KEY_MONTHLY_LOAD_KWH,
     KEY_MONTHLY_ESSENTIAL_KWH,
     KEY_TOTAL_LOAD_POWER,
+    KEY_GRID_CONNECTED_STATUS,
 )
 
 import crcmod.predefined
@@ -405,11 +406,13 @@ def parse_mqtt_payload(ph: str) -> Optional[Dict[str, Any]]:
         if ac_out_curr is not None:
             parsed_data[KEY_AC_OUT_CURRENT] = ac_out_curr
 
-        # Grid voltage (also AC input voltage)    
+        # Grid voltage (also AC input current)    
         ac_in_curr = rr("AC_IN_CURRENT", True, 0.01)
         if ac_in_curr is not None:
             parsed_data[KEY_AC_IN_CURRENT] = -ac_in_curr  # Invert sign for card compatibility
-
+        parsed_data[KEY_GRID_CONNECTED_STATUS] = (
+            ac_in_curr is not None and abs(ac_in_curr) > 0
+        )
         # AC output frequency
         ac_out_f = rr("AC_OUT_FREQ", False, 0.01)
         if ac_out_f is not None:
