@@ -29,7 +29,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = LumentreeCoordinator(hass, entry)
     device_sn = str(entry.data.get(CONF_DEVICE_SN, entry.title or "lumentree")).strip() or "lumentree"
 
-    # Tránh truyền callback nếu coordinator cập nhật qua dispatcher signal
     mqtt_client = LumentreeMqttClient(
         hass,
         entry,
@@ -44,12 +43,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
     hass.data[DOMAIN][f"{entry.entry_id}_mqtt"] = mqtt_client
 
-    # 1. Forward setup các platform (sensors,...) trước
+    # Forward setup các platform (sensor, binary_sensor,...)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # 2. CHÚ Ý: Dùng hass.loop.create_task để chạy connect ở background
-    # Giúp Home Assistant hoàn tất khởi động (Ready) ngay lập tức mà không bị kẹt
-    hass.loop.create_task(mqtt_client.connect())
+    # Chạy connect ở background bằng API chuẩn của ConfigEntry
+    entry.async_create_background_task(
+        hass, mqtt_client.connect(), "lumentree_mqtt_connect"
+    )
 
     return True
 
